@@ -1,64 +1,67 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { socket } from "../socket";
+import { socket as socketClient } from "../socket";
 
 export default function Home() {
-  const [isConnected, setIsConnected] = useState(false);
-  const [transport, setTransport] = useState("N/A");
-  const [message, setMessage] = useState("");
-  const [emitMessage, setEmitMessage] = useState("");
-  const [broadcastMessage, setBroadcastMessage] = useState("");
+  const [socket, setSocket] = useState<any>(undefined);
+  const [inbox, setInbox] = useState<any[]>([]);
+  const [message, setMessage] = useState<string>("");
+  const [roomName, setRoomName] = useState<string>("");
 
   useEffect(() => {
-    if (socket.connected) {
-      onConnect();
-    }
-
-    function onConnect() {
-      setIsConnected(true);
-      setTransport(socket.io.engine.transport.name);
-
-      socket.io.engine.on("upgrade", (transport) => {
-        setTransport(transport.name);
-      });
-    }
-
-    function onDisconnect() {
-      setIsConnected(false);
-      setTransport("N/A");
-    }
-
-    socket.on("connect", onConnect);
-    socket.on("disconnect", onDisconnect);
-    socket.on("server-messages", (value) => {
-      setMessage(value);
-      console.log("message from server: ", value)
-    });
-    // socket.on('broadcast-message', (data)=>{
-    //   console.log(data);
-    //   setBroadcastMessage(data)
-    // })
-    // socket.on('emit-message', (data)=>{
-    //   console.log(data);
-    //   setEmitMessage(data)
-    // })
-    return () => {
-      socket.off("connect", onConnect);
-      socket.off("disconnect", onDisconnect);
-    };
+    setSocket(socketClient);
   }, []);
 
+  useEffect(() => {
+    if (socket) {
+      socketClient.on("message", (message: string) => {
+        setInbox((prev) => [...prev, message]);
+      });
+    }
+  }, [socket]);
+
+  const handleMessageSubmit = () => {
+    socket.emit("message", { message, roomName });
+  };
+  const handleRoomNameSubmit = () => {
+    socket.emit("joinRoom", roomName);
+  };
   return (
     <div>
-      <p>Status: { isConnected ? "connected" : "disconnected" }</p>
-      <p>Transport: { transport }</p>
-     {message &&  <p>Message: { message }</p> }
-     {broadcastMessage &&  <p>broadcast Message: { broadcastMessage }</p> }
-     {emitMessage &&  <p>emit Message: { emitMessage }</p> }
-      <button onClick={()=>{
-        socket.emit("client-message", ".........")
-      }}>Cliked</button>
+      <div className="flex flex-col gap-5 mx-20 px-10 lg:px-48">
+        <div className="flex flex-col gap-2 border rounded-lg p-10">
+          {inbox.map((message: string, index: number) => (
+            <div key={index} className="border rounded px-4 py-2">
+              {message}
+            </div>
+          ))}
+        </div>
+
+        <div className="flex gap-2 align-center justify-center">
+          <input
+            type="text"
+            name="message"
+            className="flex-1 border rounded px-2 py-1"
+            onChange={(e) => setMessage(e.target.value)}
+          />
+          <button className="w-40" onClick={handleMessageSubmit}>
+            Send message
+          </button>
+        </div>
+
+        <div className="flex gap-2 align-center justify-center">
+          <input
+            type="text"
+            name="roomName"
+            className="flex-1 border rounded px-2 py-1"
+            onChange={(e) => setRoomName(e.target.value)}
+          />
+          <button className="w-40" onClick={handleRoomNameSubmit}>
+            Join room
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
